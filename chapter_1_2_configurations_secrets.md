@@ -1,6 +1,6 @@
 # Configuration & Secrets
 
-
+## Example ConfigMap
 
 ```yaml
 apiVersion: v1
@@ -20,6 +20,7 @@ data:
     allow.textmode=true    
 ```
 
+## Example Pod
 
 [Figure 1](https://raw.githubusercontent.com/kubernetes/website/main/content/en/examples/configmap/configure-pod.yaml)
 
@@ -64,6 +65,7 @@ spec:
         
 ```
 
+## Example Pod 2
 
 ```yaml
 apiVersion: v1
