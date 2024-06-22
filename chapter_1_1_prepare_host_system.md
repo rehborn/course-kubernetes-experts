@@ -75,3 +75,134 @@ cat /proc/swaps
 ```bash
 sudo reboot
 ```
+
+## Install CNI
+
+```bash
+# install cni plgins
+sudo mkdir -p /usr/lib/cni
+
+curl -L  https://github.com/containernetworking/plugins/releases/download/v1.5.1/cni-plugins-linux-amd64-v1.5.1.tgz -o /tmp/cni-plugins-linux-amd64-v1.5.1.tgz
+sudo tar xzvf /tmp/cni-plugins-linux-amd64-v1.5.1.tgz -C /usr/lib/cni --strip-components=1
+rm /tmp/cni-plugins-linux-amd64-v1.5.1.tgz
+
+```
+
+```bash
+# add default network configuration
+sudo mkdir -p /etc/cni/net.d
+cat << EOF | sudo tee /etc/cni/net.d/10-containerd-net.conflist
+{
+  "cniVersion": "1.0.0",
+  "name": "containerd-net",
+  "plugins": [
+    {
+      "type": "bridge",
+      "bridge": "cni0",
+      "isGateway": true,
+      "ipMasq": true,
+      "promiscMode": true,
+      "ipam": {
+        "type": "host-local",
+        "ranges": [
+          [{
+            "subnet": "10.88.0.0/16"
+          }],
+          [{
+            "subnet": "2001:4860:4860::/64"
+          }]
+        ],
+        "routes": [
+          { "dst": "0.0.0.0/0" },
+          { "dst": "::/0" }
+        ]
+      }
+    },
+    {
+      "type": "portmap",
+      "capabilities": {"portMappings": true}
+    }
+  ]
+}
+EOF
+```
+
+## Init Kubernetes (kubeadm)
+
+```bash
+# Switch to user root for next steps
+sudo su -
+```
+
+```bash
+# We're using the default settings here
+kubeadm init --pod-network-cidr=192.168.0.0/16
+
+# Copy admin kubeconfig
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+```
+
+```bash
+# Ensure everything is running
+kubectl get no
+
+kubectl -n kube-system get po
+
+# Wait 10 minutes and try again.
+# Some misconfigurations like malformed cgroups etc will cause errors
+# after some time (CrashLoopBackOff).
+
+# It's a good time to grab a coffee
+```
+
+### Only on single node clusters
+
+```bash
+# Untaint control plane to allow pod scheduling
+kubectl taint nodes --all node-role.kubernetes.io/control-plane-
+kubectl label node $HOSTNAME node-role.kubernetes.io/worker=worker
+```
+
+## Optional
+
+### Setup local storage class
+
+```bash
+cat << EOF | kubectl apply -f -
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: local-storage
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+EOF
+```
+
+### Install etcdctl
+
+For debugging purposes, I suggeest installing etcdctl.
+
+```bash
+# Install etcdctl
+ETCD_VER=v3.4.33
+
+# choose either URL
+GOOGLE_URL=https://storage.googleapis.com/etcd
+GITHUB_URL=https://github.com/etcd-io/etcd/releases/download
+DOWNLOAD_URL=${GOOGLE_URL}
+
+rm -f /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz
+rm -rf /tmp/etcd-download-test && mkdir -p /tmp/etcd-download-test
+
+curl -L ${DOWNLOAD_URL}/${ETCD_VER}/etcd-${ETCD_VER}-linux-amd64.tar.gz -o /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz
+tar xzvf /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz -C /tmp/etcd-download-test --strip-components=1
+rm -f /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz
+
+/tmp/etcd-download-test/etcd --version
+/tmp/etcd-download-test/etcdctl version
+
+sudo cp /tmp/etcd-download-test/etcdctl /usr/local/bin
+```
+
