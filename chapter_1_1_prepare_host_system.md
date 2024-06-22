@@ -165,9 +165,37 @@ kubectl taint nodes --all node-role.kubernetes.io/control-plane-
 kubectl label node $HOSTNAME node-role.kubernetes.io/worker=worker
 ```
 
-## Optional
+# Install ingress controller
 
-### Setup local storage class
+```bash
+curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+sudo apt-get install apt-transport-https --yes
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+sudo apt-get update
+sudo apt-get install helm
+```
+
+
+```bash
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo update
+```
+
+```bash
+helm upgrade -n ingress-nginx --create-namespace \
+    --install --wait --atomic \
+    --set controller.kind=DaemonSet \
+    --set controller.ingressClass=default \
+    --set controller.watchIngressWithoutClass=true \
+    --set controller.service.enabled=false \
+    --set controller.hostPort.enabled=true \
+    --set controller.extraArgs.publish-status-address=127.0.0.1 \
+    ingress-nginx ingress-nginx/ingress-nginx
+```
+
+# Optional
+
+## Setup local storage class
 
 ```bash
 cat << EOF | kubectl apply -f -
