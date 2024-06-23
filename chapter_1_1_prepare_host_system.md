@@ -1,21 +1,26 @@
 # Installation
 
-## Prepare system packages
+## Install System Packages
 
 ```bash
-sudo apt-get install -y apt-transport-https ca-certificates curl gpg net-tools
+sudo apt-get install -y apt-transport-https ca-certificates \
+    curl gpg net-tools
 ```
 
-## Install kubernetes basis
+## Install Kubernetes Base
 
 ```bash
-# If the directory `/etc/apt/keyrings` does not exist, it should be created before the curl command, read the note below.
-# sudo mkdir -p -m 755 /etc/apt/keyrings
+# Add Repository GPG Key
+KEY=/etc/apt/keyrings/kubernetes-apt-keyring.gpg
 
-curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-sudo chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+sudo mkdir -p -m 755 /etc/apt/keyrings
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key | \
+    sudo gpg --dearmor -o $KEY
+sudo chmod 644 $KEY
+
 # Add repositories
-echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+echo 'deb [signed-by=${KEY}] https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /' | \
+    sudo tee /etc/apt/sources.list.d/kubernetes.list
 
 # Install Kubernetes Packages
 sudo apt-get update
@@ -39,14 +44,15 @@ sudo apt-get install containerd
 # Fix default configuration 
 sudo mkdir -p /etc/containerd/
 containerd config default | sudo tee /etc/containerd/config.toml
-sudo sed -i 's/SystemdCgroup \= false/SystemdCgroup \= true/g' /etc/containerd/config.toml
+sudo sed -i 's/SystemdCgroup \= false/SystemdCgroup \= true/g' \
+    /etc/containerd/config.toml
 ```
 
 ```bash
 sudo systemctl enable --now containerd
 ```
 
-## Vorbereitung des Systems
+## Preparing the System 
 
 ```bash
 # Prepare os
@@ -232,5 +238,30 @@ rm -f /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz
 /tmp/etcd-download-test/etcdctl version
 
 sudo cp /tmp/etcd-download-test/etcdctl /usr/local/bin
+```
+
+## Install Calico (CNI)
+
+# Install the Operator
+```shell
+kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/tigera-operator.yaml
+kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/custom-resources.yaml
+```
+
+# Check if pods are running
+```shell
+kubectl -n tigera-operator get po
+kubectl -n calico-system get po
+```
+
+# Install Plugin for kubectl
+```shell
+curl -L https://github.com/projectcalico/calico/releases/download/v3.28.0/calicoctl-linux-amd64 -o /usr/local/bin/kubectl-calico
+chmod +x /usr/local/bin/kubectl-calico
+```
+
+# Verify Plugin Installation
+```shell
+kubectl calico -h
 ```
 
